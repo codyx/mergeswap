@@ -18,7 +18,7 @@ const CHAIN_ID = {
 }
 
 interface ChainConfig {
-	provider: ethers.providers.Provider
+	provider: ethers.providers.JsonRpcProvider
 	chainId: number
 }
 
@@ -86,14 +86,20 @@ export default {
 		const { chainId } = await chainConfig.provider.getNetwork()
 
 		// Fetch latest state root.
+		// We need to use eth_getBlockByNumber to get the rawBlock.stateRoot.
+		// See: https://github.com/ethers-io/ethers.js/issues/667
 		const block = await chainConfig.provider.getBlock('latest')
+		const rawBlock = await chainConfig.provider.send(
+			'eth_getBlockByNumber',
+			[ethers.utils.hexValue(block.number), true]
+		);
 
 		// Sign it.
 		const signer = new ethers.Wallet(env.PRIVATE_KEY)
 		const signerAccount = signer.address
 		const message = abi.encode(
 			['uint256', 'uint256', 'bytes32'],
-			[chainId, block.number, block.hash]
+			[chainId, block.number, rawBlock.stateRoot]
 		)
 		const signature = await signer.signMessage(message)
 

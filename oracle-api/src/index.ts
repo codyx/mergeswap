@@ -114,10 +114,14 @@ export default {
 		}
 		const json = JSON.stringify(res)
 
-		return new Response(json, {
+		const response = new Response(json, {
 			headers: {
 				'content-type': 'application/json;charset=UTF-8',
 			},
 		})
+
+		response.headers.set('Access-Control-Allow-Origin', "*");
+
+		return response
 	},
 };

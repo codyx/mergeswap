@@ -10,7 +10,7 @@
   "private": true,
   "scripts": {
     "start": "wrangler dev src/index.ts",
-    "deploy": "wrangler publish src/index.ts"
+    "publish": "wrangler publish src/index.ts"
   },
   "dependencies": {
     "ethers": "^5.7.0"

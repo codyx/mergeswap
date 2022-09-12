@@ -3,7 +3,9 @@ oracle-api
 
 This is a serverless oracle API developed using Cloudflare Worker framework.
 
-The service accepts HTTP GET queries on `/?chainId=XYZ`, and returns a signed response of the type `OracleResponse` (see code).
+The service accepts HTTP GET queries on `/?chainId=XYZ`, and returns a JSON response of the type `OracleResponse` (see code).
+
+`OracleResponse` contains a field `envelope`, containing the oracle data under `message` and the `signature`. `message` is [ABI](https://docs.soliditylang.org/en/v0.8.16/abi-spec.html)-encoded as `(uint256 chainId, uint256 blockNumber, bytes32 blockHash)` for the latest block returned by the chain provider. The API also returns `chainId` and `signerAccount` for descriptive purposes.
 
 ## Setup.
 

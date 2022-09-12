@@ -82,10 +82,9 @@ export default {
 		// Sign it.
 		const signer = new ethers.Wallet(env.PRIVATE_KEY)
 		const signerAccount = signer.address
-		// TODO: are we extracting world state root, or is block hash enough?
 		const message = abi.encode(
-			['uint256', 'bytes32'],
-			[chainId, block.hash]
+			['uint256', 'uint256', 'bytes32'],
+			[chainId, block.number, block.hash]
 		)
 		const signature = await signer.signMessage(message)
 

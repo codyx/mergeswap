@@ -12,29 +12,37 @@ export interface Env {
 // 
 
 const CHAIN_ID = {
-	ETHEREUM_POS_MAINNET: 1,
-	
+	ETHEREUM_PROOF_OF_STAKE_MAINNET: 1,
 	// TODO: Change later.
-	ETHEREUM_POW_MAINNET: 1,
+	ETHEREUM_PROOF_OF_WORK_MAINNET: 1,
 }
 
 interface ChainConfig {
 	provider: ethers.providers.Provider
+	chainId: number
 }
 
 function getConfig() {
 	// NOTE: StaticJsonRpcProvider syntax is needed specifically for the Cloudflare Worker environment.
 	//       See https://github.com/ethers-io/ethers.js/issues/1886#issuecomment-1063531514 for more.
 	const config: Record<string, ChainConfig> = {
-		[CHAIN_ID.ETHEREUM_POS_MAINNET]: {
+		// Proof-of-stake.
+		'eth-pos-mainnet': {
+			chainId: CHAIN_ID.ETHEREUM_PROOF_OF_STAKE_MAINNET,
 			provider: new ethers.providers.StaticJsonRpcProvider({
 				url: "https://mainnet.infura.io/v3/fab0acebc2c44109b2e486353c230998",
 				skipFetchSetup: true
 			})
-		}
+		},
 
-		// TODO: add config for POW chain.
-		// [CHAIN_ID.ETHEREUM_POW_MAINNET]: {}
+		// Proof-of-work.
+		'eth-pow-mainnet': {
+			chainId: CHAIN_ID.ETHEREUM_PROOF_OF_WORK_MAINNET,
+			provider: new ethers.providers.StaticJsonRpcProvider({
+				url: "https://rpc.mergeswap.xyz/",
+				skipFetchSetup: true
+			})
+		}
 	}
 	return config
 }
@@ -64,17 +72,18 @@ export default {
 		const url = new URL(request.url)
 		
 		// Get the chain we are providing a state root for.
-		const chainId = url.searchParams.get('chainId')
+		const chainHandle = url.searchParams.get('chainHandle')
 
-		if (!chainId) {
-			throw new Error("'chainId' parameter must be defined")
+		if (!chainHandle) {
+			throw new Error("'chainHandle' parameter must be defined")
 		}
 
 		// Lookup the provider for the chain.
-		let chainConfig = config[chainId]
+		let chainConfig = config[chainHandle]
 		if(chainConfig == null) {
-			throw new Error(`no config defined for chainId '${chainId}'`)
+			throw new Error(`no config defined for chainHandle '${chainHandle}'`)
 		}
+		const { chainId } = await chainConfig.provider.getNetwork()
 
 		// Fetch latest state root.
 		const block = await chainConfig.provider.getBlock('latest')
@@ -94,7 +103,7 @@ export default {
 				signature,
 				message,
 			},
-			chainId,
+			chainId: `${chainId}`,
 			signerAccount
 		}
 		const json = JSON.stringify(res)

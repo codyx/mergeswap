@@ -20,6 +20,10 @@ contract WrappedPoWETH is ERC20 {
     address public immutable depositContract;
     uint256 public immutable depositsMapSlotIndex;
 
+    uint256 private constant ONE = 10**18;
+    uint256 public mintFeeRate = ONE / 100; // 1/100 = 1%.
+    address public feeRecipient = 0x4200000000000000000000000000000000000000;
+
     uint256 public withdrawalsCount;
     mapping(uint256 => bytes32) public withdrawals;
 

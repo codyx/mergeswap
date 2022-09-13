@@ -72,24 +72,24 @@ describe("ReceiveWPoW", function () {
     });
   });
 
-  describe.only('mintFeeRate', () => {
+  describe('mintFeeRate', () => {
     it('should be set to 1% initially', async () => {
       const { wrappedPowETH } = await loadFixture(
         deployReceiveWPoWFixture
       );
 
-      const feeRate = wrappedPowETH.mintFeeRate()
+      const feeRate = await wrappedPowETH.mintFeeRate()
       expect(feeRate).to.equal(parseEther('0.01'))
     })
   })
 
-  describe.only('feeRecipient', () => {
+  describe('feeRecipient', () => {
     it('should be set initially', async () => {
       const { wrappedPowETH } = await loadFixture(
         deployReceiveWPoWFixture
       );
 
-      const feeRecipient = wrappedPowETH.feeRecipient()
+      const feeRecipient = await wrappedPowETH.feeRecipient()
       expect(feeRecipient).to.equal('0x4200000000000000000000000000000000000000')
     })
   })

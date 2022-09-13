@@ -9,6 +9,13 @@ Install the packages:
 yarn
 ```
 
+Install [Foundry](https://book.getfoundry.sh/getting-started/installation). Run two local blockchain networks:
+
+```sh
+anvil --port 8545
+anvil --port 8546
+```
+
 ## Compile
 ```shell
 npx hardhat compile

@@ -3,10 +3,12 @@ import { ethers } from "hardhat";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { expect } from "chai";
 import { Wallet, BigNumber } from "ethers";
-import { joinSignature, parseEther } from "ethers/lib/utils";
+import { hexZeroPad, joinSignature, keccak256, parseEther } from "ethers/lib/utils";
 
 import { proof, stateRoot } from "./mocks/proof";
 import { encodeProof } from "./utils/encode-proof";
+import { predictContractAddress } from "../scripts/utils/predict-address";
+import { JsonRpcProvider } from "@ethersproject/providers";
 
 describe("ReceiveWPoW", function () {
   const deployReceiveWPoWFixture = async () => {
@@ -21,6 +23,106 @@ describe("ReceiveWPoW", function () {
     );
     return { user, relayer, wrappedPowETH };
   };
+
+  const setupTestnets = async () => {
+    // Configure local POW and POS chains.
+    interface ChainConfig {
+      rpcUrl: string
+      provider: JsonRpcProvider
+      signer: Wallet
+    }
+    
+    let config$: any = {
+      pos: {
+        rpcUrl: "http://localhost:8545",
+        provider: null,
+        signer: null
+      },
+      pow: {
+        rpcUrl: "http://localhost:8546",
+        provider: null,
+        signer: null
+      }
+    }
+
+
+    config$.pos.provider = new ethers.providers.JsonRpcProvider(config$.pos.rpcUrl)
+    config$.pos.signer = new ethers.Wallet("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", config$.pos.provider)
+    config$.pow.provider = new ethers.providers.JsonRpcProvider(config$.pow.rpcUrl)
+    config$.pow.signer = new ethers.Wallet("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", config$.pow.provider)
+
+    let config: Record<string, ChainConfig> = config$
+
+    const relayer = new Wallet('0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d')
+    const signerAddress = await config.pos.signer.getAddress()
+
+    // Deploy DepositPOW to POW chain.
+    // 
+
+    // 1. Predict Withdrawal contract address on the POS chain.
+    const deployerNoncePoS = await config.pos.provider.getTransactionCount(signerAddress);
+    const nextPOSContractAddress = predictContractAddress(
+      signerAddress,
+      deployerNoncePoS
+    );
+
+    // 2. Deploy the Deposit contract on POW.
+    const DepositPoW = await ethers.getContractFactory("DepositPoW", config.pow.signer);
+    const depositPoW = await DepositPoW.deploy(relayer.address, nextPOSContractAddress, 6);
+    await depositPoW.deployed();
+    console.log(`DepositPoW: ${depositPoW.address}`)
+
+
+    // Deploy WrappedPOW to POS chain.
+    // 
+
+    // 1. Deploy the WrappedPOWETH contract.
+    const WrappedPoWETH = await ethers.getContractFactory("WrappedPoWETH", config.pos.signer);
+    const wrappedPowETH = await WrappedPoWETH.deploy(
+      relayer.address,
+      depositPoW.address,
+      2
+    );
+    await wrappedPowETH.deployed()
+    console.log(`WrappedPoWETH: ${wrappedPowETH.address}`)
+
+    // Deposit on POW chain.
+    // 
+    
+    const depositAmount = parseEther('1.0')
+    await depositPoW.deposit(depositAmount, signerAddress, { value: depositAmount })
+    
+    // Call eth_getProof for POW chain.
+    
+    // Args:
+    // DATA, 20 bytes - address of the account or contract
+    // ARRAY, 32 Bytes - array of storage - keys which should be proofed and included.See eth_getStorageAt
+    // QUANTITY | TAG - integer block number, or the string "latest" or "earliest", see the default block parameter
+    
+    // Compute storage key.
+    let storageKey
+    {
+      const paddedSlot = hexZeroPad("0x3", 32);
+      const paddedKey = hexZeroPad("0x0", 32);
+      const itemSlot = keccak256(paddedKey + paddedSlot.slice(2));
+      storageKey = itemSlot
+      // const storageAt = await user.provider?.getStorageAt(
+      //   depositPoW.address,
+      //   itemSlot
+      // );
+    }
+
+    // console.log(storageKey)
+    const proof = await config.pow.provider.send("eth_getProof", [depositPoW.address, [storageKey], 'latest'])
+    console.log(proof)
+
+    // Return the data for testing.
+    // 
+    const user = config.pos.signer
+    return {
+      user, relayer, wrappedPowETH, proof
+    }
+  }
 
   it("Should initialize the contract", async () => {
     const { user, relayer, wrappedPowETH } = await loadFixture(
@@ -96,9 +198,10 @@ describe("ReceiveWPoW", function () {
 
   describe.only("Mint", () => {
     it("Should mint ETHPOW", async () => {
-      const { user, relayer, wrappedPowETH } = await loadFixture(
-        deployReceiveWPoWFixture
-      );
+      const { user, relayer, wrappedPowETH, proof } = await setupTestnets()
+      // const { user, relayer, wrappedPowETH } = await loadFixture(
+      //   deployReceiveWPoWFixture
+      // );
       const sigRaw = await relayer._signingKey().signDigest(stateRoot);
       const sig = joinSignature(sigRaw);
 

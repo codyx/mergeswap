@@ -14,15 +14,12 @@ contract WrappedPoWETH is ERC20 {
 
     event Withdrawal(uint256 id, uint256 amount, address withdrawMadeBy, address recipient);
 
+    // TODO THIS IS POSITION DEPENDENT, MAKE SURE TO DOCUMENT IN DEPOSIT.
     uint8 private constant ACCOUNT_STORAGE_ROOT_INDEX = 2;
 
     address public immutable relayer;
     address public immutable depositContract;
     uint256 public immutable depositsMapSlotIndex;
-
-    uint256 private constant ONE = 10**18;
-    uint256 public mintFeeRate = ONE / 100; // 1/100 = 1%.
-    address public feeRecipient = 0x4200000000000000000000000000000000000000;
 
     uint256 public withdrawalsCount;
     mapping(uint256 => bytes32) public withdrawals;
@@ -31,6 +28,10 @@ contract WrappedPoWETH is ERC20 {
     mapping(uint256 => bytes32) public depositContractStorageRoots;
 
     mapping(uint256 => bool) public processedDeposits;
+
+    uint256 private constant ONE = 10**18;
+    uint256 public mintFeeRate = ONE / 100; // 1/100 = 1%.
+    address public feeRecipient = 0x4200000000000000000000000000000000000000;
 
     constructor(
         address _relayer,
@@ -42,6 +43,9 @@ contract WrappedPoWETH is ERC20 {
         depositsMapSlotIndex = _depositsMapSlotIndex;
     }
 
+    // Proofs require:
+    // - account proof of (deposit contract)
+    // - storage proof of (deposit contract)
     function updateDepositContractStorageRoot(uint256 blockNumber, bytes memory accountProof) public {
         bytes32 stateRoot = stateRoots[blockNumber];
         require(stateRoot != bytes32(0), "ERR_STATE_ROOT_NOT_AVAILABLE");

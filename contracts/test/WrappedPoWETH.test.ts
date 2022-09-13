@@ -2,7 +2,7 @@ import { ethers } from "hardhat";
 
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { expect } from "chai";
-import { Wallet } from "ethers";
+import { BigNumber, Wallet } from "ethers";
 import { hexZeroPad, joinSignature, keccak256, parseEther } from "ethers/lib/utils";
 
 import { powProof, powStateRoot } from "./mocks/proof";
@@ -281,7 +281,7 @@ describe("ReceiveWPoW", function () {
       const storageProofEncoded = encodeProof(powProof.storageProof[0].proof);
       await wrappedPowETH.mint(
         "0",
-        "0xF6db677FB4c73A98CB991BCa6C01bD4EC98e9398",
+        user.address,
         parseEther("1"),
         blockNumber,
         storageProofEncoded, 
@@ -289,23 +289,22 @@ describe("ReceiveWPoW", function () {
       );
 
       const tokensMinted = await wrappedPowETH.balanceOf(
-        "0xF6db677FB4c73A98CB991BCa6C01bD4EC98e9398"
+        user.address
       );
       expect(tokensMinted).equal(parseEther("1"));
 
       // TODO: fix these.
-      // const minterAccount = "0xf37Fd9185Bb5657D7E57DDEA268Fe56C2458F675"
-      // const feeRecipientAccount = await wrappedPowETH.feeRecipient()
-      // const mintFeeRate = await wrappedPowETH.mintFeeRate()
-      // const amount = BigNumber.from(proof.storageProof[0].value)
-      // const amountStr = proof.storageProof[0].value
-      // const feeAmount = amount.mul(mintFeeRate)
+      const minterAccount = user.address
+      const feeRecipientAccount = await wrappedPowETH.feeRecipient()
+      const mintFeeRate = await wrappedPowETH.mintFeeRate()
+      const amount = parseEther("1")
+      const feeAmount = amount.mul(mintFeeRate)
 
-      // const minterTokenBalance = await wrappedPowETH.balanceOf(minterAccount);
-      // const feeRecipientTokenBalance = await wrappedPowETH.balanceOf(feeRecipientAccount);
+      const minterTokenBalance = await wrappedPowETH.balanceOf(minterAccount);
+      const feeRecipientTokenBalance = await wrappedPowETH.balanceOf(feeRecipientAccount);
 
-      // expect(minterTokenBalance).equal(amount.sub(feeAmount));
-      // expect(feeRecipientTokenBalance).equal(feeAmount);
+      expect(minterTokenBalance).equal(amount.sub(feeAmount));
+      expect(feeRecipientTokenBalance).equal(feeAmount);
 
       // const tokensMinted = await wrappedPowETH.balanceOf(relayer.address);
       // expect(tokensMinted).equal(amount);

@@ -2,8 +2,8 @@ import { ethers } from "hardhat";
 
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { expect } from "chai";
-import { Wallet } from "ethers";
-import { joinSignature } from "ethers/lib/utils";
+import { Wallet, BigNumber } from "ethers";
+import { joinSignature, parseEther } from "ethers/lib/utils";
 
 import { proof, stateRoot } from "./mocks/proof";
 import { encodeProof } from "./utils/encode-proof";
@@ -72,7 +72,29 @@ describe("ReceiveWPoW", function () {
     });
   });
 
-  describe("Mint", () => {
+  describe.only('mintFeeRate', () => {
+    it('should be set to 1% initially', async () => {
+      const { wrappedPowETH } = await loadFixture(
+        deployReceiveWPoWFixture
+      );
+
+      const feeRate = wrappedPowETH.mintFeeRate()
+      expect(feeRate).to.equal(parseEther('0.01'))
+    })
+  })
+
+  describe.only('feeRecipient', () => {
+    it('should be set initially', async () => {
+      const { wrappedPowETH } = await loadFixture(
+        deployReceiveWPoWFixture
+      );
+
+      const feeRecipient = wrappedPowETH.feeRecipient()
+      expect(feeRecipient).to.equal('0x4200000000000000000000000000000000000000')
+    })
+  })
+
+  describe.only("Mint", () => {
     it("Should mint ETHPOW", async () => {
       const { user, relayer, wrappedPowETH } = await loadFixture(
         deployReceiveWPoWFixture
@@ -95,13 +117,26 @@ describe("ReceiveWPoW", function () {
       await wrappedPowETH.mint(
         "0xf37Fd9185Bb5657D7E57DDEA268Fe56C2458F675",
         relayer.address,
-        "0",
+        "0", // we don't need to provide amount, it's provided on the other chain during deposit.
         blockNumber,
         storageProofEncoded
       );
 
+      const minterAccount = "0xf37Fd9185Bb5657D7E57DDEA268Fe56C2458F675"
+      const feeRecipientAccount = await wrappedPowETH.feeRecipient()
+      const mintFeeRate = await wrappedPowETH.mintFeeRate()
+      const amount = BigNumber.from(proof.storageProof[0].value)
+      const amountStr = proof.storageProof[0].value
+      const feeAmount = amount.mul(mintFeeRate)
+
+      const minterTokenBalance = await wrappedPowETH.balanceOf(minterAccount);
+      const feeRecipientTokenBalance = await wrappedPowETH.balanceOf(feeRecipientAccount);
+
+      expect(minterTokenBalance).equal(amount.sub(feeAmount));
+      expect(feeRecipientTokenBalance).equal(feeAmount);
+
       const tokensMinted = await wrappedPowETH.balanceOf(relayer.address);
-      expect(tokensMinted).equal(proof.storageProof[0].value);
+      expect(tokensMinted).equal(amount);
     });
 
     it("Should revert in case a deposit is attempted to be minted twice", async () => {

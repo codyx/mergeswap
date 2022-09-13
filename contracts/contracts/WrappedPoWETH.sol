@@ -49,6 +49,7 @@ contract WrappedPoWETH is ERC20 {
         depositContractStorageRoots[blockNumber] = accountStorageRoot;
     }
 
+    // Mints the WPOWETH token.
     // TODO make it secure currently anyone can claim a deposit
     // Solution: the value under deposit id should be keccak(value, recipient)
     // Solution: include a new parameter deposit data which is a tuple of (value, recipient)
@@ -74,6 +75,7 @@ contract WrappedPoWETH is ERC20 {
         _mint(recipient, slotValue);
     }
 
+    // Burns the WPOWETH token.
     function withdraw(uint256 amount, address recipient) public {
         _burn(msg.sender, amount);
         withdrawals[withdrawalsCount] = keccak256(abi.encode(amount, recipient));

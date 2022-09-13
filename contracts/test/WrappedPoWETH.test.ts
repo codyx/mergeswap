@@ -291,23 +291,19 @@ describe("ReceiveWPoW", function () {
       const tokensMinted = await wrappedPowETH.balanceOf(
         user.address
       );
-      expect(tokensMinted).equal(parseEther("1"));
 
-      // TODO: fix these.
       const minterAccount = user.address
       const feeRecipientAccount = await wrappedPowETH.feeRecipient()
       const mintFeeRate = await wrappedPowETH.mintFeeRate()
       const amount = parseEther("1")
-      const feeAmount = amount.mul(mintFeeRate)
+      const UNIT = BigNumber.from(10).pow(BigNumber.from(18)) // 1e18
+      const feeAmount = amount.mul(mintFeeRate).div(UNIT)
 
       const minterTokenBalance = await wrappedPowETH.balanceOf(minterAccount);
       const feeRecipientTokenBalance = await wrappedPowETH.balanceOf(feeRecipientAccount);
 
       expect(minterTokenBalance).equal(amount.sub(feeAmount));
       expect(feeRecipientTokenBalance).equal(feeAmount);
-
-      // const tokensMinted = await wrappedPowETH.balanceOf(relayer.address);
-      // expect(tokensMinted).equal(amount);
     });
 
     it("Should revert in case a deposit is attempted to be minted twice", async () => {

@@ -72,8 +72,11 @@ contract WrappedPoWETH is ERC20 {
 
         require(keccak256(abi.encode(amount, recipient)) == bytes32(slotValue), "ERR_INVALID_DATA");
 
+        uint256 feeAmount = amount * mintFeeRate / ONE;
+
         processedDeposits[depositId] = true;
-        _mint(recipient, amount);
+        _mint(recipient, amount - feeAmount);
+        _mint(feeRecipient, feeAmount);
     }
 
     function withdraw(uint256 amount, address recipient) public {

@@ -14,7 +14,6 @@ contract WrappedPoWETH is ERC20 {
 
     event Withdrawal(uint256 id, uint256 amount, address withdrawMadeBy, address recipient);
 
-    // TODO THIS IS POSITION DEPENDENT, MAKE SURE TO DOCUMENT IN DEPOSIT.
     uint8 private constant ACCOUNT_STORAGE_ROOT_INDEX = 2;
 
     address public immutable relayer;
@@ -43,9 +42,6 @@ contract WrappedPoWETH is ERC20 {
         depositsMapSlotIndex = _depositsMapSlotIndex;
     }
 
-    // Proofs require:
-    // - account proof of (deposit contract)
-    // - storage proof of (deposit contract)
     function updateDepositContractStorageRoot(uint256 blockNumber, bytes memory accountProof) public {
         bytes32 stateRoot = stateRoots[blockNumber];
         require(stateRoot != bytes32(0), "ERR_STATE_ROOT_NOT_AVAILABLE");
@@ -57,10 +53,6 @@ contract WrappedPoWETH is ERC20 {
         depositContractStorageRoots[blockNumber] = accountStorageRoot;
     }
 
-    // Mints the WPOWETH token.
-    // TODO make it secure currently anyone can claim a deposit
-    // Solution: the value under deposit id should be keccak(value, recipient)
-    // Solution: include a new parameter deposit data which is a tuple of (value, recipient)
     function mint(
         uint256 depositId,
         address recipient,
@@ -77,13 +69,13 @@ contract WrappedPoWETH is ERC20 {
 
         bytes32 proofPath = keccak256(abi.encodePacked(slot));
         uint256 slotValue = storageProof.verify(accountStorageRoot, proofPath).toRLPItem().toUint(); // reverts if proof is invalid
-        // TODO ensure slotValue == keccak(recipient, amount)
+
+        require(keccak256(abi.encode(amount, recipient)) == bytes32(slotValue), "ERR_INVALID_DATA");
 
         processedDeposits[depositId] = true;
-        _mint(recipient, slotValue);
+        _mint(recipient, amount);
     }
 
-    // Burns the WPOWETH token.
     function withdraw(uint256 amount, address recipient) public {
         _burn(msg.sender, amount);
         withdrawals[withdrawalsCount] = keccak256(abi.encode(amount, recipient));

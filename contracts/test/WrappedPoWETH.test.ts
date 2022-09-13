@@ -2,10 +2,10 @@ import { ethers } from "hardhat";
 
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { expect } from "chai";
-import { Wallet, BigNumber } from "ethers";
-import { defaultAbiCoder, formatEther, hexZeroPad, joinSignature, keccak256, parseEther } from "ethers/lib/utils";
+import { BigNumber, Wallet } from "ethers";
+import { hexZeroPad, joinSignature, keccak256, parseEther } from "ethers/lib/utils";
 
-import { proof, stateRoot } from "./mocks/proof";
+import { powProof, powStateRoot } from "./mocks/proof";
 import { encodeProof } from "./utils/encode-proof";
 import { predictContractAddress } from "../scripts/utils/predict-address";
 import { JsonRpcProvider } from "@ethersproject/providers";
@@ -18,11 +18,12 @@ describe("ReceiveWPoW", function () {
     const WrappedPoWETH = await ethers.getContractFactory("WrappedPoWETH");
     const wrappedPowETH = await WrappedPoWETH.deploy(
       relayer.address,
-      "0x6b175474e89094c44da98b954eedeac495271d0f",
-      2
+      "0xE0f8a92b85aD593d31565Dd0666A45b875Bd9b8A",
+      3
     );
     return { user, relayer, wrappedPowETH };
   };
+
 
   const setupTestnets = async () => {
     // Configure local POW and POS chains.
@@ -31,7 +32,7 @@ describe("ReceiveWPoW", function () {
       provider: JsonRpcProvider
       signer: Wallet
     }
-    
+
     let config$: any = {
       pos: {
         rpcUrl: "http://localhost:8545",
@@ -49,7 +50,7 @@ describe("ReceiveWPoW", function () {
     config$.pos.signer = new ethers.Wallet("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", config$.pos.provider)
     config$.pow.provider = new ethers.providers.JsonRpcProvider(config$.pow.rpcUrl)
     config$.pow.signer = new ethers.Wallet("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", config$.pow.provider)
-    
+
     // Prefund accounts from geth dev account.
     let config: Record<string, ChainConfig> = config$
 
@@ -70,8 +71,8 @@ describe("ReceiveWPoW", function () {
     // 2. Deploy the Deposit contract on POW.
     const DepositPoW = await ethers.getContractFactory("DepositPoW", config.pow.signer);
     const depositPoW = await DepositPoW.deploy(
-      relayer.address, 
-      nextPOSContractAddress, 
+      relayer.address,
+      nextPOSContractAddress,
       6
     );
     await depositPoW.deployed();
@@ -86,24 +87,24 @@ describe("ReceiveWPoW", function () {
     const wrappedPowETH = await WrappedPoWETH.deploy(
       relayer.address,
       depositPoW.address,
-      2
+      3
     );
     await wrappedPowETH.deployed()
     console.log(`WrappedPoWETH: ${wrappedPowETH.address}`)
 
     // Deposit on POW chain.
     // 
-    
+
     const depositAmount = parseEther('1.0')
     await depositPoW.deposit(depositAmount, signerAddress, { value: depositAmount, gasLimit: 11000000 })
-    
+
     // Call eth_getProof for POW chain.
     // 
 
     // Compute storage key.
     let storageKey
     {
-      const paddedSlot = hexZeroPad("0x3", 32);
+      const paddedSlot = hexZeroPad("0x4", 32);
       const paddedKey = hexZeroPad("0x0", 32);
       const itemSlot = keccak256(paddedKey + paddedSlot.slice(2));
       storageKey = itemSlot
@@ -157,8 +158,8 @@ describe("ReceiveWPoW", function () {
       // console.log(`depositInfo`, depositInfo)
       // console.log(`storageAt  `, storageAt)
     }
-    
-    
+
+
     // console.log(storageKey)
     const proof = await config.pow.provider.send(
       "eth_getProof",
@@ -177,7 +178,7 @@ describe("ReceiveWPoW", function () {
     // 
     const user = config.pos.signer
     return {
-      user, relayer, wrappedPowETH, proof, stateRoot
+      user, relayer, wrappedPowETH, proof, stateRoot, depositAmount
     }
   }
 
@@ -192,16 +193,16 @@ describe("ReceiveWPoW", function () {
       const { user, relayer, wrappedPowETH } = await loadFixture(
         deployReceiveWPoWFixture
       );
-      const sigRaw = await relayer._signingKey().signDigest(stateRoot);
+      const sigRaw = await relayer._signingKey().signDigest(powStateRoot);
       const sig = joinSignature(sigRaw);
 
       const blockNumber = 10;
       await wrappedPowETH
         .connect(user)
-        .relayStateRoot(blockNumber, stateRoot, sig);
+        .relayStateRoot(blockNumber, powStateRoot, sig);
 
       const setStateRoot = await wrappedPowETH.stateRoots(blockNumber);
-      expect(setStateRoot).equal(stateRoot);
+      expect(setStateRoot).equal(powStateRoot);
     });
   });
 
@@ -210,15 +211,15 @@ describe("ReceiveWPoW", function () {
       const { user, relayer, wrappedPowETH } = await loadFixture(
         deployReceiveWPoWFixture
       );
-      const sigRaw = await relayer._signingKey().signDigest(stateRoot);
+      const sigRaw = await relayer._signingKey().signDigest(powStateRoot);
       const sig = joinSignature(sigRaw);
 
       const blockNumber = 10;
       await wrappedPowETH
         .connect(user)
-        .relayStateRoot(blockNumber, stateRoot, sig);
+        .relayStateRoot(blockNumber, powStateRoot, sig);
 
-      const accountProofEncoded = encodeProof(proof.accountProof);
+      const accountProofEncoded = encodeProof(powProof.accountProof);
       await wrappedPowETH.updateDepositContractStorageRoot(
         blockNumber,
         accountProofEncoded
@@ -227,7 +228,7 @@ describe("ReceiveWPoW", function () {
       const setStorageRoot = await wrappedPowETH.depositContractStorageRoots(
         blockNumber
       );
-      expect(setStorageRoot).equal(proof.storageHash);
+      expect(setStorageRoot).equal(powProof.storageHash);
     });
   });
 
@@ -253,43 +254,38 @@ describe("ReceiveWPoW", function () {
     })
   })
 
-  describe.only("Mint", () => {
-    it("Should mint ETHPOW", async () => {
-      const { user, relayer, wrappedPowETH, proof, stateRoot } = await setupTestnets()
+  describe("Mint", () => {
+    it.only("Should mint ETHPOW", async () => {
       // const { user, relayer, wrappedPowETH } = await loadFixture(
       //   deployReceiveWPoWFixture
       // );
+      const { user, relayer, wrappedPowETH, proof, stateRoot, depositAmount } = await setupTestnets()
 
       const sigRaw = await relayer._signingKey().signDigest(stateRoot);
       const sig = joinSignature(sigRaw);
 
       const blockNumber = 10;
       await wrappedPowETH
-        .connect(user)
         .relayStateRoot(blockNumber, stateRoot, sig, { gasLimit: 11000000 });
 
-      proof.accountProof.map((part: string) => ethers.utils.RLP.decode(part))
-
-      const accountProofEncoded = encodeProof(proof.accountProof);
-
+      const accountProofEncoded = encodeProof(powProof.accountProof);
       await wrappedPowETH.updateDepositContractStorageRoot(
         blockNumber,
-        accountProofEncoded,
+        accountProofEncoded, 
         { gasLimit: 11000000 }
       );
 
-      const storageProofEncoded = encodeProof(proof.storageProof[0].proof);
+      const storageProofEncoded = encodeProof(powProof.storageProof[0].proof);
       await wrappedPowETH.mint(
-        // "0xf37Fd9185Bb5657D7E57DDEA268Fe56C2458F675",
-        0,
-        relayer.address,
-        "0", // we don't need to provide amount, it's provided on the other chain during deposit.
+        "0",
+        "0xF6db677FB4c73A98CB991BCa6C01bD4EC98e9398",
+        '10000',
         blockNumber,
-        storageProofEncoded,
+        storageProofEncoded, 
         { gasLimit: 11000000 }
       );
 
-      const minterAccount = "0xf37Fd9185Bb5657D7E57DDEA268Fe56C2458F675"
+      const minterAccount = "0xF6db677FB4c73A98CB991BCa6C01bD4EC98e9398"
       const feeRecipientAccount = await wrappedPowETH.feeRecipient()
       const mintFeeRate = await wrappedPowETH.mintFeeRate()
       const amount = BigNumber.from(proof.storageProof[0].value)
@@ -297,6 +293,7 @@ describe("ReceiveWPoW", function () {
       const feeAmount = amount.mul(mintFeeRate)
 
       const minterTokenBalance = await wrappedPowETH.balanceOf(minterAccount);
+      console.log(minterTokenBalance)
       const feeRecipientTokenBalance = await wrappedPowETH.balanceOf(feeRecipientAccount);
 
       expect(minterTokenBalance).equal(amount.sub(feeAmount));
@@ -310,41 +307,43 @@ describe("ReceiveWPoW", function () {
       const { user, relayer, wrappedPowETH } = await loadFixture(
         deployReceiveWPoWFixture
       );
-      const sigRaw = await relayer._signingKey().signDigest(stateRoot);
+      const sigRaw = await relayer._signingKey().signDigest(powStateRoot);
       const sig = joinSignature(sigRaw);
 
       const blockNumber = 10;
       await wrappedPowETH
         .connect(user)
-        .relayStateRoot(blockNumber, stateRoot, sig);
+        .relayStateRoot(blockNumber, powStateRoot, sig);
 
-      const accountProofEncoded = encodeProof(proof.accountProof);
+      const accountProofEncoded = encodeProof(powProof.accountProof);
       await wrappedPowETH.updateDepositContractStorageRoot(
         blockNumber,
         accountProofEncoded
       );
 
-      const storageProofEncoded = encodeProof(proof.storageProof[0].proof);
+      const storageProofEncoded = encodeProof(powProof.storageProof[0].proof);
       await wrappedPowETH.mint(
-        "0xf37Fd9185Bb5657D7E57DDEA268Fe56C2458F675",
-        relayer.address,
         "0",
+        "0xF6db677FB4c73A98CB991BCa6C01bD4EC98e9398",
+        parseEther("1"),
         blockNumber,
         storageProofEncoded
       );
 
       expect(
         wrappedPowETH.mint(
-          "0xf37Fd9185Bb5657D7E57DDEA268Fe56C2458F675",
-          relayer.address,
           "0",
+          "0xF6db677FB4c73A98CB991BCa6C01bD4EC98e9398",
+          parseEther("1"),
           blockNumber,
           storageProofEncoded
         )
       ).throws;
 
-      const tokensMinted = await wrappedPowETH.balanceOf(relayer.address);
-      expect(tokensMinted).equal(proof.storageProof[0].value);
+      const tokensMinted = await wrappedPowETH.balanceOf(
+        "0xF6db677FB4c73A98CB991BCa6C01bD4EC98e9398"
+      );
+      expect(tokensMinted).equal(parseEther("1"));
     });
   });
 });

@@ -30,7 +30,7 @@ contract WrappedPoWETH is ERC20 {
     
     uint256 private constant ONE = 10**18;
     uint256 public mintFeeRate = ONE / 100; // 1/100 = 1%.
-    address public feeRecipient = 0x4200000000000000000000000000000000000000;
+    address public feeRecipient = 0x951a09BF364A15703312ed59CBb3ab7cf92905e6;
 
     constructor(
         address _relayer,

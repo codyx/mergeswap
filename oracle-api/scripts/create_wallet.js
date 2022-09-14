@@ -1,4 +1,7 @@
 const ethers = require('ethers')
+const wallet = ethers.Wallet.createRandom()
+
 console.log(
-    ethers.Wallet.createRandom()._signingKey()
+    wallet,
+    wallet._signingKey()
 )

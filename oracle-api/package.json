@@ -11,7 +11,7 @@
   "private": true,
   "scripts": {
     "start": "wrangler dev src/index.ts",
-    "publish": "wrangler publish src/index.ts",
+    "publish:production": "wrangler publish --env production",
     "publish:staging": "wrangler publish --env staging"
   },
   "dependencies": {

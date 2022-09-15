@@ -40,5 +40,6 @@ echo "$PRIVATE_KEY_HERE" | wrangler secret put PRIVATE_KEY
 Publish worker:
 
 ```sh
-wrangler publish src/index.ts --name oracle-api
+npm run publish:staging
+npm run publish:production
 ```

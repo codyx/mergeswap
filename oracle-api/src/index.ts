@@ -2,9 +2,13 @@
 import * as ethers from 'ethers'
 const abi = ethers.utils.defaultAbiCoder;
 
+// Deployment environments.
+type WorkerEnvironment = 'staging' | 'production'
+
 // Environment variables of worker.
 export interface Env {
 	PRIVATE_KEY: string
+	WORKER_ENV: WorkerEnvironment
 }
 
 // 
@@ -22,10 +26,10 @@ interface ChainConfig {
 	chainId: number
 }
 
-function getConfig() {
+function getConfig(env: WorkerEnvironment) {
 	// NOTE: StaticJsonRpcProvider syntax is needed specifically for the Cloudflare Worker environment.
 	//       See https://github.com/ethers-io/ethers.js/issues/1886#issuecomment-1063531514 for more.
-	const config: Record<string, ChainConfig> = {
+	const configProduction: Record<string, ChainConfig> = {
 		// Proof-of-stake.
 		'eth-pos-mainnet': {
 			chainId: CHAIN_ID.ETHEREUM_PROOF_OF_STAKE_MAINNET,
@@ -44,11 +48,41 @@ function getConfig() {
 			})
 		}
 	}
-	return config
+
+	const configStaging: Record<string, ChainConfig> = {
+		// Proof-of-stake - Polygon Mumbai.
+		'eth-pos-mainnet': {
+			chainId: 0x13881,
+			provider: new ethers.providers.StaticJsonRpcProvider({
+				url: "https://polygon-mumbai.g.alchemy.com/v2/8cEmFkR9yPUssIYH5dMf9LvPCseGdRUz",
+				skipFetchSetup: true
+			})
+		},
+
+		// Proof-of-work - Goerli.
+		'eth-pow-mainnet': {
+			chainId: 0x5,
+			provider: new ethers.providers.StaticJsonRpcProvider({
+				url: "https://eth-goerli.g.alchemy.com/v2/9kKXw55I8QNAK7AtQT14gXAQus13eZsg/",
+				skipFetchSetup: true
+			})
+		}
+	}
+
+	const configs = {
+		staging: configStaging,
+		production: configProduction
+	}
+
+	if (!(env in configs)) {
+		throw new Error(`No chain config for environment: ${env}`)
+	}
+	
+	return configs[env]
 }
 
 interface OracleRequest {
-	chainId: number
+	chainHandle: string
 }
 
 interface OracleResponse {
@@ -67,7 +101,8 @@ export default {
 		env: Env,
 		ctx: ExecutionContext
 	): Promise<Response> {
-		const config = getConfig()
+		console.log(env)
+		const config = getConfig(env.WORKER_ENV)
 
 		const url = new URL(request.url)
 		
@@ -79,7 +114,7 @@ export default {
 		}
 
 		// Lookup the provider for the chain.
-		let chainConfig = config[chainHandle]
+		const chainConfig = config[chainHandle]
 		if(chainConfig == null) {
 			throw new Error(`no config defined for chainHandle '${chainHandle}'`)
 		}

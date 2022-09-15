@@ -1,9 +1,35 @@
 name = "oracle-api"
 compatibility_date = "2022-09-11"
 node_compat = true
+main = 'src/index.ts'
 
-[vars]
+# [vars]
 # This is a private key used during development.
 # In production, you must set one using:
 # echo "$PRIVATE_KEY" | wrangler secret put PRIVATE_KEY
+# PRIVATE_KEY = "0x57678cb3021a7aa39d08839ea7d47ea0246a6f27a0cde894e732a02ee95f20ea"
+
+
+
+# 
+# Staging.
+# 
+[env.staging]
+name = "oracle-staging"
+
+[env.staging.vars]
+WORKER_ENV = "staging"
 PRIVATE_KEY = "0x57678cb3021a7aa39d08839ea7d47ea0246a6f27a0cde894e732a02ee95f20ea"
+
+# 
+# Production.
+# 
+
+[env.production]
+name = "oracle-production"
+
+[env.production.vars]
+WORKER_ENV = "production"
+# These must be set using `wrangler secret put`.
+# e.g. `echo "0x57678cb3021a7aa39d08839ea7d47ea0246a6f27a0cde894e732a02ee95f20ea" | wrangler secret put PRIVATE_KEY`.
+# - PRIVATE_KEY

@@ -10,7 +10,7 @@
   },
   "private": true,
   "scripts": {
-    "start": "wrangler dev src/index.ts",
+    "start": "wrangler dev src/index.ts --env development",
     "publish:production": "wrangler publish --env production",
     "publish:staging": "wrangler publish --env staging"
   },

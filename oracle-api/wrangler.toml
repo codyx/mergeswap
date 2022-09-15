@@ -10,6 +10,15 @@ main = 'src/index.ts'
 # PRIVATE_KEY = "0x57678cb3021a7aa39d08839ea7d47ea0246a6f27a0cde894e732a02ee95f20ea"
 
 
+# 
+# Development.
+# 
+[env.development]
+name = "oracle-development"
+
+[env.development.vars]
+WORKER_ENV = "production"
+PRIVATE_KEY = "0x57678cb3021a7aa39d08839ea7d47ea0246a6f27a0cde894e732a02ee95f20ea"
 
 # 
 # Staging.
@@ -18,7 +27,7 @@ main = 'src/index.ts'
 name = "oracle-staging"
 
 [env.staging.vars]
-WORKER_ENV = "staging"
+WORKER_ENV = "production"
 PRIVATE_KEY = "0x57678cb3021a7aa39d08839ea7d47ea0246a6f27a0cde894e732a02ee95f20ea"
 
 # 

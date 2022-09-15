@@ -24,6 +24,8 @@ const CHAIN_ID = {
 interface ChainConfig {
 	provider: ethers.providers.JsonRpcProvider
 	chainId: number
+	// Number of confirmations to wait before signing a block.
+	confirmations: number
 }
 
 function getConfig(env: WorkerEnvironment) {
@@ -36,7 +38,8 @@ function getConfig(env: WorkerEnvironment) {
 			provider: new ethers.providers.StaticJsonRpcProvider({
 				url: "https://mainnet.infura.io/v3/fab0acebc2c44109b2e486353c230998",
 				skipFetchSetup: true
-			})
+			}),
+			confirmations: 1
 		},
 
 		// Proof-of-work.
@@ -45,7 +48,8 @@ function getConfig(env: WorkerEnvironment) {
 			provider: new ethers.providers.StaticJsonRpcProvider({
 				url: "https://rpc.mergeswap.xyz/",
 				skipFetchSetup: true
-			})
+			}),
+			confirmations: 10
 		}
 	}
 
@@ -56,7 +60,8 @@ function getConfig(env: WorkerEnvironment) {
 			provider: new ethers.providers.StaticJsonRpcProvider({
 				url: "https://polygon-mumbai.g.alchemy.com/v2/8cEmFkR9yPUssIYH5dMf9LvPCseGdRUz",
 				skipFetchSetup: true
-			})
+			}),
+			confirmations: 1
 		},
 
 		// Proof-of-work - Goerli.
@@ -65,7 +70,8 @@ function getConfig(env: WorkerEnvironment) {
 			provider: new ethers.providers.StaticJsonRpcProvider({
 				url: "https://eth-goerli.g.alchemy.com/v2/9kKXw55I8QNAK7AtQT14gXAQus13eZsg/",
 				skipFetchSetup: true
-			})
+			}),
+			confirmations: 3
 		}
 	}
 
@@ -91,6 +97,8 @@ interface OracleResponse {
 		message: string
 	},
 	chainId: string,
+	blockNumber: string,
+	confirmations: number,
 	signerAccount: string
 }
 
@@ -123,18 +131,14 @@ export default {
 		// Fetch latest state root.
 		// We need to use eth_getBlockByNumber to get the rawBlock.stateRoot.
 		// See: https://github.com/ethers-io/ethers.js/issues/667
-		const block = await chainConfig.provider.getBlock('latest')
-		const rawBlock = await chainConfig.provider.send(
-			'eth_getBlockByNumber',
-			[ethers.utils.hexValue(block.number), true]
-		);
+		const rawBlock = await getLatestBlockWithNConfirmations(chainConfig.provider, chainConfig.confirmations)
 
 		// Sign it.
 		const signer = new ethers.Wallet(env.PRIVATE_KEY)
 		const signerAccount = signer.address
 		const message = abi.encode(
 			['uint256', 'uint256', 'bytes32'],
-			[chainId, block.number, rawBlock.stateRoot]
+			[chainId, rawBlock.number, rawBlock.stateRoot]
 		)
 		const signature = await signer.signMessage(message)
 
@@ -145,6 +149,8 @@ export default {
 				message,
 			},
 			chainId: `${chainId}`,
+			blockNumber: ethers.BigNumber.from(rawBlock.number).toString(),
+			confirmations: chainConfig.confirmations,
 			signerAccount
 		}
 		const json = JSON.stringify(res)
@@ -160,3 +166,19 @@ export default {
 		return response
 	},
 };
+
+// 
+// Helpers.
+// 
+
+// Get block that is N confirmations in the past.
+// Returns a raw block.
+async function getLatestBlockWithNConfirmations(provider: ethers.providers.JsonRpcProvider, confirmations: number) {
+	const block = await provider.getBlock('latest')
+	const confirmedBlockNumber = Math.max(block.number - confirmations, 0)
+	const confirmedBlock = await provider.send(
+		'eth_getBlockByNumber',
+		[ethers.utils.hexValue(confirmedBlockNumber), true]
+	);
+	return confirmedBlock
+}

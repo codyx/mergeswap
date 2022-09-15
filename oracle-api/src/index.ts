@@ -109,29 +109,50 @@ export default {
 		env: Env,
 		ctx: ExecutionContext
 	): Promise<Response> {
-		console.log(env)
 		const config = getConfig(env.WORKER_ENV)
 
 		const url = new URL(request.url)
 		
 		// Get the chain we are providing a state root for.
 		const chainHandle = url.searchParams.get('chainHandle')
+		let blockNumberStr = url.searchParams.get('blockNumber')
+		if (!blockNumberStr) {
+			throw new Error("'blockNumber' parameter must be defined")
+		}
+		
+		const blockNumber = parseInt(blockNumberStr)
+		const params = {
+			chainHandle,
+			blockNumber
+		}
 
-		if (!chainHandle) {
+		if (!params.chainHandle) {
 			throw new Error("'chainHandle' parameter must be defined")
 		}
 
 		// Lookup the provider for the chain.
-		const chainConfig = config[chainHandle]
+		const chainConfig = config[params.chainHandle]
 		if(chainConfig == null) {
-			throw new Error(`no config defined for chainHandle '${chainHandle}'`)
+			throw new Error(`no config defined for chainHandle '${params.chainHandle}'`)
 		}
 		const { chainId } = await chainConfig.provider.getNetwork()
 
 		// Fetch latest state root.
 		// We need to use eth_getBlockByNumber to get the rawBlock.stateRoot.
 		// See: https://github.com/ethers-io/ethers.js/issues/667
-		const rawBlock = await getLatestBlockWithNConfirmations(chainConfig.provider, chainConfig.confirmations)
+		// const rawBlock = await getLatestBlockWithNConfirmations(chainConfig.provider, chainConfig.confirmations)
+		const { provider, confirmations } = chainConfig
+		const latestBlock = await provider.getBlock('latest')
+		// The tip of the blockchain when we consider our min confirmations.
+		const confirmedTipBlockNumber = Math.max(latestBlock.number - confirmations, 0)
+		console.debug('latestBlock', latestBlock.number, 'confirmedTipBlockNumber', confirmedTipBlockNumber)
+		if (confirmedTipBlockNumber < blockNumber) {
+			throw new Error(`Block cannot be signed, it does not have the required number of confirmations.\nblockNumber = ${blockNumber}\nrequired confirmations = ${confirmations}\nlatest block        = ${latestBlock.number}\nlatest secure block = ${confirmedTipBlockNumber}`)
+		}
+		const rawBlock = await provider.send(
+			'eth_getBlockByNumber',
+			[ethers.utils.hexValue(blockNumber), true]
+		);
 
 		// Sign it.
 		const signer = new ethers.Wallet(env.PRIVATE_KEY)
@@ -166,19 +187,3 @@ export default {
 		return response
 	},
 };
-
-// 
-// Helpers.
-// 
-
-// Get block that is N confirmations in the past.
-// Returns a raw block.
-async function getLatestBlockWithNConfirmations(provider: ethers.providers.JsonRpcProvider, confirmations: number) {
-	const block = await provider.getBlock('latest')
-	const confirmedBlockNumber = Math.max(block.number - confirmations, 0)
-	const confirmedBlock = await provider.send(
-		'eth_getBlockByNumber',
-		[ethers.utils.hexValue(confirmedBlockNumber), true]
-	);
-	return confirmedBlock
-}

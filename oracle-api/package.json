@@ -11,8 +11,9 @@
   "private": true,
   "scripts": {
     "start": "wrangler dev src/index.ts --env development",
-    "publish:production": "wrangler publish --env production",
-    "publish:staging": "wrangler publish --env staging"
+    "publish:all": "npm run publish:staging && npm run publish:production",
+    "publish:staging": "wrangler publish --env staging",
+    "publish:production": "wrangler publish --env production"
   },
   "dependencies": {
     "ethers": "^5.7.0"

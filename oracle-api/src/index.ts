@@ -1,6 +1,5 @@
 import * as ethers from "ethers";
 import { joinSignature } from "ethers/lib/utils";
-const abi = ethers.utils.defaultAbiCoder;
 
 // Deployment environments.
 type WorkerEnvironment = "staging" | "production";
@@ -14,12 +13,6 @@ export interface Env {
 //
 // Types.
 //
-
-const CHAIN_ID = {
-  ETHEREUM_PROOF_OF_STAKE_MAINNET: 1,
-  // TODO: Change later.
-  ETHEREUM_PROOF_OF_WORK_MAINNET: 1,
-};
 
 interface ChainConfig {
   provider: ethers.providers.JsonRpcProvider;
@@ -98,7 +91,6 @@ interface OracleRequest {
 interface OracleResponse {
   envelope: {
     signature: string;
-    message: string;
   };
   chainId: string;
   blockNumber: string;
@@ -148,12 +140,7 @@ async function work(request: Request, env: Env, ctx: ExecutionContext) {
     latestBlock.number - confirmations,
     0
   );
-  console.debug(
-    "latestBlock",
-    latestBlock.number,
-    "confirmedTipBlockNumber",
-    confirmedTipBlockNumber
-  );
+
   if (confirmedTipBlockNumber < blockNumber) {
     throw new Error(
       `Block cannot be signed, it does not have the required number of confirmations.\nblockNumber = ${blockNumber}\nrequired confirmations = ${confirmations}\nlatest block        = ${latestBlock.number}\nlatest secure block = ${confirmedTipBlockNumber}`
@@ -167,18 +154,6 @@ async function work(request: Request, env: Env, ctx: ExecutionContext) {
   // Sign it.
   const signer = new ethers.Wallet(env.PRIVATE_KEY);
   const signerAccount = signer.address;
-  const message = abi.encode(
-    ["uint256", "uint256", "bytes32"],
-    [chainId, rawBlock.number, rawBlock.stateRoot]
-  );
-  // const message = {
-  //   chainId,
-  //   blockNumber: rawBlock.number,
-  //   stateRoot: rawBlock.stateRoot,
-  // };
-
-  // old sig way
-  // const signature = await signer.signMessage(message);
 
   const sigRaw = signer._signingKey().signDigest(rawBlock.stateRoot);
   const signature = joinSignature(sigRaw);
@@ -187,7 +162,6 @@ async function work(request: Request, env: Env, ctx: ExecutionContext) {
   const res: OracleResponse = {
     envelope: {
       signature,
-      message,
     },
     chainId: `${chainId}`,
     blockNumber: ethers.BigNumber.from(rawBlock.number).toString(),
@@ -196,6 +170,8 @@ async function work(request: Request, env: Env, ctx: ExecutionContext) {
   };
   return res;
 }
+
+// Middleware
 
 async function jsonResponse(obj: any): Promise<Response> {
   const response = new Response(JSON.stringify(obj), {
